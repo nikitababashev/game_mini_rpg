@@ -1,0 +1,71 @@
+#define SDL_MAIN_USE_CALLBACKS 1
+#include<SDL3/SDL.h>
+#include<SDL3/SDL_main.h>
+#include<iostream>
+#include<stdio.h>
+#include<SDL3_image/SDL_image.h>
+
+static SDL_Window* window;
+static SDL_Renderer* renderer;
+static SDL_Texture* player; // 1. СДЕЛАЛИ ПЕРЕМЕННУЮ ГЛОБАЛЬНОЙ (теперь её видят все функции)
+
+SDL_FRect rect = { 0, 0, 64*1.5, 128*1.5 };
+SDL_FRect srcrect = { 0, 0, 64, 128 };
+int speed = 10;
+
+SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
+	SDL_Init(SDL_INIT_VIDEO);
+	SDL_CreateWindowAndRenderer("oaoaoudaoda che ya nesu", 800, 640, 0, &window, &renderer);
+
+	// 2. УБРАЛИ тип SDL_Texture* перед именем, чтобы инициализировать глобальную переменную, а не создавать новую локальную
+	player = IMG_LoadTexture(renderer, "assets/player/64X128_Walking_Free.png");
+
+	if (!player) {
+		SDL_Log("Ошибка загрузки картинки: %s", SDL_GetError());
+	}
+
+	return SDL_APP_CONTINUE;
+}
+
+SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
+	switch (event->type)
+	{
+	case SDL_EVENT_QUIT:
+		return SDL_APP_SUCCESS;
+		break;
+	default:
+		break;
+	}
+	return SDL_APP_CONTINUE;
+}
+
+SDL_AppResult SDL_AppIterate(void* appstate) {
+	SDL_SetRenderDrawColor(renderer, 77, 239, 239, 255);
+	SDL_RenderClear(renderer);
+
+	const bool* keys = SDL_GetKeyboardState(NULL);
+
+	if (keys[SDL_SCANCODE_W]) { rect.y -= speed; }
+	if (keys[SDL_SCANCODE_S]) { rect.y += speed; }
+	if (keys[SDL_SCANCODE_A]) { rect.x -= speed; }
+	if (keys[SDL_SCANCODE_D]) { rect.x += speed; }
+
+	// 3. Просто рисуем картинку. Больше тут ничего удалять нельзя!
+	SDL_RenderTexture(renderer, player, &srcrect, &rect);
+
+	SDL_RenderPresent(renderer);
+	SDL_Delay(16);
+
+	return SDL_APP_CONTINUE;
+}
+
+void SDL_AppQuit(void* appstate, SDL_AppResult result)
+{
+	// 4. Правильное место для удаления текстуры — при закрытии всей игры
+	if (player) {
+		SDL_DestroyTexture(player);
+	}
+	SDL_DestroyRenderer(renderer);
+	SDL_DestroyWindow(window);
+	SDL_Quit();
+}
