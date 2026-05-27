@@ -42,7 +42,7 @@ private:
 	SDL_FRect src;
 	SDL_Texture* texture;
 	int speed;
-	int run_speed;
+	int walk_speed;
 	animation idle;
 	animationData animations;
 	int currentIndex;

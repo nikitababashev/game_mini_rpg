@@ -22,100 +22,80 @@ void Player::showAnimation(animation animation, int now, int delay) {
 }
 void Player::update(){
 	const bool* keys = SDL_GetKeyboardState(NULL);
-	isWalk = -1;
-	if (keys[SDL_SCANCODE_LSHIFT]) {
-		speed = run_speed;
-	}
-	if (keys[SDL_SCANCODE_W]) {
-		isWalk = 3;
-		dest.y -= speed; 
-	}
-	if (keys[SDL_SCANCODE_S]) { 
-		isWalk = 0;
-		dest.y += speed; 
-	}
-	if (keys[SDL_SCANCODE_A]) { 
-		isWalk = 1;
-		dest.x -= speed; 
-	}
-	if (keys[SDL_SCANCODE_D]) { 
-		isWalk = 2;
-		dest.x += speed; 
-	}
 
 	Uint64 now = SDL_GetTicks();//время инициализации и текущее
 	int delay = now - lastUpdate;
 	
-	if (not keys[SDL_SCANCODE_LSHIFT]){
-		speed = 2;
-		if (isWalk == 0) {
-			showAnimation(animations.walk_w, now, delay);
-			where_see_idle = 0;
-			}
-		else if (isWalk == 1){
-			showAnimation(animations.walk_a, now, delay);
-			where_see_idle = 1;
-		}
-		else if (isWalk == 2) {
-			showAnimation(animations.walk_d, now, delay);
-			where_see_idle = 2;
-		}
-		else if (isWalk == 3) {
-			showAnimation(animations.walk_s, now, delay);
-			where_see_idle = 3;
-		}
-		else {
-			if (where_see_idle == 0) {
-				showAnimation(animations.idle_w, now, delay);
-			}
-			else if (where_see_idle == 1) {
-				showAnimation(animations.idle_a, now, delay);
-			}
-			else if (where_see_idle == 2) {
-				showAnimation(animations.idle_d, now, delay);
-			}
-			else if (where_see_idle == 3) {
-				showAnimation(animations.idle_s, now, delay);
-			}
-		}
+	if (keys[SDL_SCANCODE_S] and not keys[SDL_SCANCODE_LSHIFT]) {
+		dest.y += speed;
+		showAnimation(animations.walk_w, now, delay);
+		where_see_idle = 0;
 	}
-	else if (keys[SDL_SCANCODE_LSHIFT]) {
-		if ((keys[SDL_SCANCODE_W]) and isWalk == 0) {
-			showAnimation(animations.run_w, now, delay);
-			where_see_idle = 0;
+	else if (keys[SDL_SCANCODE_A] and not keys[SDL_SCANCODE_LSHIFT]) {
+		dest.x -= speed;
+		showAnimation(animations.walk_a, now, delay);
+		where_see_idle = 1;
+	}
+	else if (keys[SDL_SCANCODE_D] and not keys[SDL_SCANCODE_LSHIFT]) {
+		dest.x += speed;
+		showAnimation(animations.walk_d, now, delay);
+		where_see_idle = 2;
+	}
+	else if (keys[SDL_SCANCODE_W] and not keys[SDL_SCANCODE_LSHIFT]) {
+		dest.y -= speed;
+		showAnimation(animations.walk_s, now, delay);
+		where_see_idle = 3;
+	}
+	else if (keys[SDL_SCANCODE_W] and keys[SDL_SCANCODE_LSHIFT]) {
+		dest.y -= walk_speed;
+		showAnimation(animations.run_s, now, delay);
+	}
+	else if (keys[SDL_SCANCODE_S] and keys[SDL_SCANCODE_LSHIFT]) {
+		dest.y += walk_speed;
+		showAnimation(animations.run_w, now, delay);
+	}
+	else if (keys[SDL_SCANCODE_A] and keys[SDL_SCANCODE_LSHIFT]) {
+		dest.x -= walk_speed;
+		showAnimation(animations.run_a, now, delay);
+	}
+	else if (keys[SDL_SCANCODE_D] and keys[SDL_SCANCODE_LSHIFT]) {
+		dest.x += walk_speed;
+		showAnimation(animations.run_d, now, delay);
+	}
+	else {
+		if (where_see_idle == 0) {
+			showAnimation(animations.idle_w, now, delay);
 		}
-		else if ((keys[SDL_SCANCODE_A]) and isWalk == 1) {
-			showAnimation(animations.run_a, now, delay);
-			where_see_idle = 1;
+		else if (where_see_idle == 1) {
+			showAnimation(animations.idle_a, now, delay);
 		}
-		else if ((keys[SDL_SCANCODE_D]) and isWalk == 2) {
-			showAnimation(animations.run_d, now, delay);
-			where_see_idle = 2;
+		else if (where_see_idle == 2) {
+			showAnimation(animations.idle_d, now, delay);
 		}
-		else if ((keys[SDL_SCANCODE_S]) and isWalk == 3) {
-			showAnimation(animations.run_s, now, delay);
-			where_see_idle = 3;
+		else if (where_see_idle == 3) {
+			showAnimation(animations.idle_s, now, delay);
 		}
 	}
 
 }
 void Player::initAnimations() {
-
 	animations.idle_w = { 8, 100, 0 };
 	animations.idle_a = { 8, 100, 1 };
 	animations.idle_d = { 8, 100, 2 };
 	animations.idle_s = { 8, 100, 3 };
 
-	animations.walk_w = { 10, 100, 4 };
-	animations.walk_a = { 10, 100, 5 };
-	animations.walk_d = { 10, 100, 6 };
-	animations.walk_s = { 10, 100, 7 };
+	animations.walk_w = { 8, 100, 4 };
+	animations.walk_a = { 8, 100, 5 };
+	animations.walk_d = { 8, 100, 6 };
+	animations.walk_s = { 8, 100, 7 };
 
 	animations.run_w = { 8, 100, 8 };
 	animations.run_a = { 8, 100, 9 };
 	animations.run_d = { 8, 100, 10 };
-	animations.run_s = { 8, 100, 11 };
+	animations.run_s = { 8, 100, 11};
 
+
+	
 }
 
 Player::Player(SDL_Renderer* renderer, std::string texturePath): renderer(renderer)
@@ -127,7 +107,7 @@ Player::Player(SDL_Renderer* renderer, std::string texturePath): renderer(render
 	texture = IMG_LoadTexture(renderer, texturePath.c_str());
 	dest = { 0, 0, 64 * 1.5, 64 * 3.5 };
 	src = { 0, 0, 64, 64 * 2 };
-	run_speed = 5;
+	walk_speed = 5;
 	speed = 2;
 
 }
