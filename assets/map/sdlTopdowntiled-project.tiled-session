@@ -1,0 +1,39 @@
+{
+    "activeFile": "chetocheto.tmx",
+    "expandedProjectPaths": [
+    ],
+    "fileStates": {
+        "chetocheto.tmx": {
+            "scale": 2,
+            "selectedLayer": 1,
+            "viewCenter": {
+                "x": -490,
+                "y": -360.25
+            }
+        },
+        "chetocheto.tmx#Pixel 16 v2 village free": {
+            "scaleInDock": 2
+        }
+    },
+    "last.exportedFilePath": "C:/Users/Михаил/source/repos/game_mini_rpg/assets/map",
+    "last.imagePath": "C:/Users/Михаил/source/repos/game_mini_rpg/assets/Pixel 16 v2 village free",
+    "map.fixedSize": false,
+    "map.height": 34,
+    "map.lastUsedExportFilter": "Все файлы (*)",
+    "map.lastUsedFormat": "tmx",
+    "map.tileHeight": 16,
+    "map.tileWidth": 16,
+    "map.width": 60,
+    "openFiles": [
+        "chetocheto.tmx"
+    ],
+    "project": "sdlTopdowntiled-project.tiled-project",
+    "recentFiles": [
+        "chetocheto.tmx"
+    ],
+    "tileset.embedInMap": true,
+    "tileset.tileSize": {
+        "height": 16,
+        "width": 16
+    }
+}

@@ -1,0 +1,65 @@
+{
+    "activeFile": "1234.tmx",
+    "expandedProjectPaths": [
+        "."
+    ],
+    "fileStates": {
+        "1234.tmx": {
+            "scale": 1,
+            "selectedLayer": 1,
+            "viewCenter": {
+                "x": 349.5,
+                "y": 1049.5
+            }
+        },
+        "2.json": {
+            "scale": 0.75,
+            "selectedLayer": 1,
+            "viewCenter": {
+                "x": 667.3333333333333,
+                "y": 605.9999999999999
+            }
+        },
+        "5.json": {
+            "scale": 0.25,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": -7530,
+                "y": 730
+            }
+        },
+        "TX Plant with Shadow.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "free_pixel_16_woods.tsx": {
+            "scaleInDock": 2,
+            "scaleInEditor": 1
+        }
+    },
+    "last.exportedFilePath": "C:/Users/Михаил/source/repos/game_mini_rpg/assets/map",
+    "last.imagePath": "C:/Users/Михаил/source/repos/game_mini_rpg/assets/Texture/Extra",
+    "map.height": 68,
+    "map.lastUsedExportFilter": "Все файлы (*)",
+    "map.lastUsedFormat": "tmx",
+    "map.tileHeight": 32,
+    "map.tileWidth": 32,
+    "map.width": 120,
+    "openFiles": [
+        "1234.tmx",
+        "TX Plant with Shadow.tsx"
+    ],
+    "project": "3.tiled-project",
+    "recentFiles": [
+        "TX Plant with Shadow.tsx",
+        "1234.tmx",
+        "2.json",
+        "5.json",
+        "free_pixel_16_woods.tsx"
+    ],
+    "tileset.lastUsedFormat": "tsx",
+    "tileset.tileSize": {
+        "height": 32,
+        "width": 32
+    }
+}

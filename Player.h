@@ -1,7 +1,6 @@
 #pragma once
 #include<SDL3/SDL.h>
 #include<string>
-
 typedef struct animation {//новый тип данных
 	int frames;
 	int animationDelay;
@@ -29,13 +28,18 @@ class Player
 {
 public:
 	Player(SDL_Renderer* renderer, std::string texturePath);
-	void draw();
+	void draw(float camX, float camY, float zoom);
 	void update();
 	void handleEvents();
+	float worldX = 0.0f;
+	float worldY = 0.0f;
 	~Player();
 
 private:
 	void initAnimations();
+	float posX; 
+	float posY; // начальная позиция игрока
+	
 	void showAnimation(animation animation, int now, int delay);
 	SDL_Renderer* renderer;
 	SDL_FRect dest;
