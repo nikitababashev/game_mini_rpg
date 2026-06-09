@@ -1,13 +1,13 @@
 #pragma once
 #include<SDL3/SDL.h>
 #include<string>
-typedef struct animation {//новый тип данных
+struct animation {//новый тип данных
 	int frames;
 	int animationDelay;
 	int y;
 };
 
-typedef struct animationData {//новый тип данных
+struct animationData {//новый тип данных
 	animation walk_w;
 	animation walk_a;
 	animation walk_d;

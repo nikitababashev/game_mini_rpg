@@ -24,7 +24,6 @@ using json = nlohmann::json;
 static SDL_Window* window;
 
 Player* player = nullptr;
-NPC* npc = nullptr;
 Resource* thing = nullptr;
 TileMap* tileMap = nullptr;
 SDL_Texture* menuBackground = nullptr;
@@ -80,7 +79,6 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     // Размещаем NPC в точке (800, 600) мира (можно привязать к тайлам)
     dialogueNPC = new NPC1(renderer, "assets/NPC/idle(64x64).png", 550.0f, 400.0f);
 	player = new Player(renderer, "assets/player/split.png");
-	npc = new NPC(renderer, "assets/NPC/idle(64x64).png");
 	/*thing = new Resource();*/
     tileMap = new TileMap();
     if (!tileMap->loadFromJSON("assets/map/1234.json")) {
@@ -126,7 +124,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
     }
     else if (gameState == STATE_GAME) {
         player->handleEvents();
-        npc->handleEvents();   // старый NPC, если он что-то делает
+        dialogueNPC->handleEvents();   // старый NPC, если он что-то делает
 
         if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_E) {
             if (!dialogMgr.isActive() && dialogueNPC && dialogueNPC->isPlayerNear(player->worldX, player->worldY)) {
@@ -204,13 +202,15 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
             static_cast<float>(tileMap->mapWidth * tileMap->tileWidth),
             static_cast<float>(tileMap->mapHeight * tileMap->tileHeight));
         tileMap->render(renderer, camera.x, camera.y, camera.zoom);
+        // Рисуем npc раньше, чтобы наш персонаж рисовался перед нпс (т.е.,чтобы нпс не заслонял нашего персонажа)
+        if (dialogueNPC) {
+            dialogueNPC->update();
+            dialogueNPC->draw(camera.x, camera.y, camera.zoom);
+        }
         player->update();
         player->draw(camera.x, camera.y, camera.zoom);
         
         // Рисуем нашего интерактивного NPC
-        if (dialogueNPC) {
-            dialogueNPC->draw(camera.x, camera.y, camera.zoom);
-        }
         dialogMgr.draw(renderer);
     }
 

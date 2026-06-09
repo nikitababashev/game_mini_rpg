@@ -1,4 +1,4 @@
-#include "NPC.h"
+/*#include "NPC.h"
 #include<SDL3_image/SDL_image.h>
 
 void NPC::handleEvents() {
@@ -46,3 +46,4 @@ NPC::~NPC()
 {
 	SDL_DestroyTexture(texture);
 }
+*/

@@ -1,4 +1,4 @@
-#pragma once
+/*#pragma once
 #include<SDL3/SDL.h>
 #include<string>
 
@@ -39,4 +39,4 @@ private:
 	int isWalk;
 	int where_see_idle;
 	SDL_FlipMode flip;
-};
+};*/
