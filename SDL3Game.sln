@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.37301.9
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SDL3Game", "SDL3Game.vcxproj", "{11D95B92-1293-4270-8BAE-D58C14463328}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{11D95B92-1293-4270-8BAE-D58C14463328}.Debug|x64.ActiveCfg = Debug|x64
+		{11D95B92-1293-4270-8BAE-D58C14463328}.Debug|x64.Build.0 = Debug|x64
+		{11D95B92-1293-4270-8BAE-D58C14463328}.Debug|x86.ActiveCfg = Debug|Win32
+		{11D95B92-1293-4270-8BAE-D58C14463328}.Debug|x86.Build.0 = Debug|Win32
+		{11D95B92-1293-4270-8BAE-D58C14463328}.Release|x64.ActiveCfg = Release|x64
+		{11D95B92-1293-4270-8BAE-D58C14463328}.Release|x64.Build.0 = Release|x64
+		{11D95B92-1293-4270-8BAE-D58C14463328}.Release|x86.ActiveCfg = Release|Win32
+		{11D95B92-1293-4270-8BAE-D58C14463328}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {0C86EA1F-12C8-411A-8A52-1E373CB1F8ED}
+	EndGlobalSection
+EndGlobal
