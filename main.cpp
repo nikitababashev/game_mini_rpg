@@ -81,6 +81,12 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     if (!extraImage) SDL_Log("Доп. картинка не загружена: %s", SDL_GetError());
 
     dialogueNPC = new NPC1(renderer, "assets/NPC/idle(64x64).png", 550.0f, 400.0f);
+    dialogueNPC->dialogueLines = {
+    "Привет! Ты попал на чудо остров!",
+    "Хочешь, подарю тебе амулет?"
+    };
+    dialogueNPC->option1 = "Да(1)";
+    dialogueNPC->option2 = "Нет(2)";
     player = new Player(renderer, "assets/player/split.png");
 
     tileMap = new TileMap();
@@ -91,7 +97,12 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     if (!tileMap->loadTilesetTexture(renderer, "assets/Texture/TX Plant.png")) {
         SDL_Log("Ошибка загрузки тайлсета!");
     }
-
+    if (tileMap) {
+        player->setWorldBounds(
+            tileMap->mapWidth * tileMap->tileWidth,
+            tileMap->mapHeight * tileMap->tileHeight
+        );
+    }
     return SDL_APP_CONTINUE;
 }
 
@@ -108,6 +119,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_RETURN) {
             gameState = STATE_MENU;
             // Запускаем музыку главного меню
+
             audioManager.playMusic("assets/audio/Playboi-Carti-magnolia.wav", -1);
         }
         return SDL_APP_CONTINUE;
@@ -129,17 +141,36 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         player->handleEvents();
         dialogueNPC->handleEvents();
 
-        if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_E) {
-            if (dialogMgr.isActive()) {
-                dialogMgr.hide();
-                // Возвращаем игровую музыку после закрытия диалога
-                audioManager.playMusic("assets/audio/korolevskij_XVII_-_1_5__SkySound.cc__1.wav", -1);
+        if (event->type == SDL_EVENT_KEY_DOWN) {
+            // Если диалог в режиме выбора – реагируем на 1 и 2
+            if (dialogMgr.isActive() && dialogMgr.isWaitingChoice()) {
+                if (event->key.key == SDLK_1) {
+                    dialogMgr.handleChoice(1);
+                    audioManager.playMusic("assets/audio/korolevskij_XVII_-_1_5__SkySound.cc__1.wav", -1);
+                }
+                else if (event->key.key == SDLK_2) {
+                    dialogMgr.handleChoice(2);
+                    audioManager.playMusic("assets/audio/korolevskij_XVII_-_1_5__SkySound.cc__1.wav", -1);
+                }
             }
-            else {
-                if (dialogueNPC && dialogueNPC->isPlayerNear(player->worldX, player->worldY)) {
-                    dialogMgr.show(dialogueNPC->dialogueText, dialogFont, renderer);
-                    // Включаем диалоговый трек
-                    audioManager.playMusic("assets/audio/Playboi-Carti-Molly.wav", -1);
+            // Обычный диалог (E)
+            else if (event->key.key == SDLK_E) {
+                if (!dialogMgr.isActive()) {
+                    if (dialogueNPC && dialogueNPC->isPlayerNear(player->worldX, player->worldY)) {
+                        dialogMgr.show(
+                            dialogueNPC->dialogueLines,
+                            dialogueNPC->option1, [&]() { dialogueNPC->gaveItem = true; },
+                            dialogueNPC->option2, [&]() { dialogueNPC->gaveItem = false; },
+                            dialogFont, renderer
+                        );
+                        audioManager.playMusic("assets/audio/Playboi-Carti-Molly.wav", -1);
+                    }
+                }
+                else {
+                    dialogMgr.next();
+                    if (!dialogMgr.isActive()) {
+                        audioManager.playMusic("assets/audio/korolevskij_XVII_-_1_5__SkySound.cc__1.wav", -1);
+                    }
                 }
             }
         }

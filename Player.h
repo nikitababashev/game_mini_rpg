@@ -32,10 +32,13 @@ public:
 	void update();
 	void handleEvents();
 	float worldX = 0.0f;
+	void setWorldBounds(float w, float h);
 	float worldY = 0.0f;
 	~Player();
 
 private:
+	float worldW = 0.0f;   // ширина мира в пикселях
+	float worldH = 0.0f;
 	void initAnimations();
 	float posX; 
 	float posY; // начальная позиция игрока

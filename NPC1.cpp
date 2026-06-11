@@ -20,8 +20,8 @@ NPC1::NPC1(SDL_Renderer* renderer, const std::string& texPath, float x, float y)
     // Инициализация src для спрайтов
     src.x = 0;
     src.y = 0;
-    src.w = 46;  // ширина кадра
-    src.h = 55;  // высота кадра
+    src.w = 46.0f; // ширина
+    src.h = 55.0f; // высота кадра
     dest.w = width;
     dest.h = height;
 }

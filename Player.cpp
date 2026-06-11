@@ -7,6 +7,11 @@ void Player::handleEvents() {
 
 }
 
+void Player::setWorldBounds(float w, float h) {
+	worldW = w;
+	worldH = h;
+}
+
 void Player::draw(float camX, float camY, float zoom) {
 	SDL_FRect dest = {
 		(worldX - camX) * zoom,
@@ -81,7 +86,15 @@ void Player::update() {
 			showAnimation(animations.idle_s, now, delay);
 		}
 	}
+	if (worldW > 0 && worldH > 0) {
+		float halfW = 32.0f;   // половина ширины спрайта (64/2)
+		float halfH = 64.0f;   // половина высоты спрайта (128/2)
 
+		if (worldX - halfW < 0.0f) worldX = halfW;
+		if (worldY - halfH < 0.0f) worldY = halfH;
+		if (worldX + halfW > worldW) worldX = worldW - halfW;
+		if (worldY + halfH > worldH) worldY = worldH - halfH;
+	}
 }
 void Player::initAnimations() {
 	animations.idle_w = { 8, 100, 0 };
