@@ -404,8 +404,26 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             // Использование предмета (F)
             else if (event->key.key == SDLK_F) {
                 const InventorySlot* item = playerInventory.getSelectedItem();
-                if (item) {
-                    SDL_Log("Used item: %s x%d", item->itemName.c_str(), item->count);
+                if (item && !item->isEmpty()) {
+                    SDL_Log("=== Using item: %s (count: %d) ===", item->itemName.c_str(), item->count);
+
+                    if (item->itemName == "Magic Crystal") {
+                        SDL_Log("You used the magic crystal! It shines brightly!");
+                        if (playerInventory.removeItem("Magic Crystal", 1)) {
+                            SDL_Log("SUCCESS: Magic Crystal removed!");
+                        }
+                        else {
+                            SDL_Log("FAILED: Could not remove Magic Crystal");
+                        }
+                    }
+                    else if (item->itemName == "Golden Flower") {
+                        SDL_Log("You used the Golden Flower! It scatters petals!");
+                        //цветок тоже не удаляем
+                    }
+                    else if (item->itemName == "Magic Amulet") {
+                        SDL_Log("You used the amulet! You feel magical power!");
+                        // Амулет не удаляем
+                    }
                 }
             }
         }

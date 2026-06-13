@@ -3,7 +3,6 @@
 #include <SDL3_ttf/SDL_ttf.h>
 #include <SDL3_image/SDL_image.h>
 #include <algorithm>
-#include <sstream>
 
 Inventory::Inventory() {
     slots.resize(SLOT_COUNT);
@@ -22,7 +21,6 @@ bool Inventory::init(SDL_Renderer* ren, TTF_Font* fnt, const std::string& slotTe
         return false;
     }
 
-    // Загружаем текстуру ячейки инвентаря из файла
     slotTexture = IMG_LoadTexture(renderer, slotTexturePath.c_str());
     if (!slotTexture) {
         SDL_Log("Inventory::init: failed to load slot texture from %s: %s",
@@ -30,21 +28,16 @@ bool Inventory::init(SDL_Renderer* ren, TTF_Font* fnt, const std::string& slotTe
         return false;
     }
 
-    // Получаем реальный размер текстуры
-    float texW, texH;
-    SDL_GetTextureSize(slotTexture, &texW, &texH);
-
     selectedSlotTexture = createSelectedSlotTexture();
     if (!selectedSlotTexture) {
         selectedSlotTexture = slotTexture;
     }
 
-    // Создаём фон панели (полупрозрачный прямоугольник)
-    SDL_Surface* bgSurface = SDL_CreateSurface(
-        (int)(SLOT_COUNT * (SLOT_SIZE + SLOT_PADDING) + SLOT_PADDING * 2),
-        (int)(BAR_HEIGHT),
-        SDL_PIXELFORMAT_ARGB8888
-    );
+    // Создаём фон панели
+    int bgWidth = (int)(SLOT_COUNT * (SLOT_SIZE + SLOT_PADDING) + SLOT_PADDING * 2);
+    int bgHeight = (int)BAR_HEIGHT;
+
+    SDL_Surface* bgSurface = SDL_CreateSurface(bgWidth, bgHeight, SDL_PIXELFORMAT_ARGB8888);
     if (bgSurface) {
         SDL_FillSurfaceRect(bgSurface, nullptr, SDL_MapSurfaceRGBA(bgSurface, 20, 20, 30, 200));
         slotBgTexture = SDL_CreateTextureFromSurface(renderer, bgSurface);
@@ -64,7 +57,6 @@ bool Inventory::init(SDL_Renderer* ren, TTF_Font* fnt, const std::string& slotTe
 SDL_Texture* Inventory::createSelectedSlotTexture() {
     if (!slotTexture) return nullptr;
 
-    // Получаем размеры оригинальной текстуры
     float texW, texH;
     SDL_GetTextureSize(slotTexture, &texW, &texH);
 
@@ -79,39 +71,31 @@ SDL_Texture* Inventory::createSelectedSlotTexture() {
     SDL_Texture* oldTarget = SDL_GetRenderTarget(renderer);
     SDL_SetRenderTarget(renderer, targetTex);
 
-    // Рисуем оригинальную текстуру
     SDL_FRect rect = { 0, 0, texW, texH };
     SDL_RenderTexture(renderer, slotTexture, nullptr, &rect);
 
-    // Рисуем эффект выделения
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 255, 215, 0, 180); // Золотистый
+    SDL_SetRenderDrawColor(renderer, 255, 215, 0, 180);
 
-    // Рисуем рамку
     SDL_FRect borderRect = { 4, 4, texW - 8, texH - 8 };
     SDL_RenderRect(renderer, &borderRect);
 
-    // Рисуем уголки для эффекта выделения
     float cornerSize = 15.0f;
-    // Верхний левый угол
     SDL_FRect corner1 = { 2, 2, cornerSize, 4 };
     SDL_RenderFillRect(renderer, &corner1);
     SDL_FRect corner1b = { 2, 2, 4, cornerSize };
     SDL_RenderFillRect(renderer, &corner1b);
 
-    // Верхний правый угол
     SDL_FRect corner2 = { texW - cornerSize - 2, 2, cornerSize, 4 };
     SDL_RenderFillRect(renderer, &corner2);
     SDL_FRect corner2b = { texW - 6, 2, 4, cornerSize };
     SDL_RenderFillRect(renderer, &corner2b);
 
-    // Нижний левый угол
     SDL_FRect corner3 = { 2, texH - 6, cornerSize, 4 };
     SDL_RenderFillRect(renderer, &corner3);
     SDL_FRect corner3b = { 2, texH - cornerSize - 2, 4, cornerSize };
     SDL_RenderFillRect(renderer, &corner3b);
 
-    // Нижний правый угол
     SDL_FRect corner4 = { texW - cornerSize - 2, texH - 6, cornerSize, 4 };
     SDL_RenderFillRect(renderer, &corner4);
     SDL_FRect corner4b = { texW - 6, texH - cornerSize - 2, 4, cornerSize };
@@ -211,11 +195,9 @@ void Inventory::drawItemCount(int slotIndex, int count, float x, float y, float 
     float texW, texH;
     SDL_GetTextureSize(numberTex, &texW, &texH);
 
-    // Позиция числа
     float textX = x + slotSize - texW - 8.0f;
     float textY = y + slotSize - texH - 6.0f;
 
-    // Маленькая тень для читаемости (можно убрать, как тебе по вайбу)
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
     SDL_FRect shadowRect = { textX + 1, textY + 1, texW, texH };
     SDL_RenderFillRect(renderer, &shadowRect);
@@ -234,12 +216,10 @@ void Inventory::draw(float screenWidth, float screenHeight) {
 
     updateNumberCache();
 
-    //позиция панели
     float totalWidth = SLOT_COUNT * SLOT_SIZE + (SLOT_COUNT - 1) * SLOT_PADDING;
     float startX = (screenWidth - totalWidth) / 2.0f;
     float startY = screenHeight - BAR_HEIGHT - BOTTOM_OFFSET;
 
-    // Рисуем фон панели
     if (slotBgTexture) {
         float bgWidth = totalWidth + SLOT_PADDING * 2;
         float bgHeight = BAR_HEIGHT;
@@ -249,27 +229,22 @@ void Inventory::draw(float screenWidth, float screenHeight) {
         SDL_RenderTexture(renderer, slotBgTexture, nullptr, &bgDest);
     }
 
-    // Рисуем слоты
     for (int i = 0; i < SLOT_COUNT; ++i) {
         float x = startX + i * (SLOT_SIZE + SLOT_PADDING);
         float y = startY;
 
         SDL_FRect dest = { x, y, SLOT_SIZE, SLOT_SIZE };
 
-        // Выбираем текстуру слота (выделенный или обычный)
         SDL_Texture* currentSlotTex = (i == selectedSlot) ? selectedSlotTexture : slotTexture;
         if (currentSlotTex) {
             SDL_RenderTexture(renderer, currentSlotTex, nullptr, &dest);
         }
 
-        // Если есть предмет — рисуем его иконку
         if (!slots[i].isEmpty() && slots[i].icon) {
             float iconPadding = 12.0f;
             float iconSize = SLOT_SIZE - iconPadding * 2;
             SDL_FRect iconDest = { x + iconPadding, y + iconPadding, iconSize, iconSize };
             SDL_RenderTexture(renderer, slots[i].icon, nullptr, &iconDest);
-
-            // Рисуем количество
             drawItemCount(i, slots[i].count, x, y, SLOT_SIZE);
         }
     }
@@ -307,6 +282,7 @@ void Inventory::draw(float screenWidth, float screenHeight) {
 }
 
 void Inventory::update() {
+    // Обновление инвентаря
 }
 
 bool Inventory::addItem(const std::string& itemName, SDL_Texture* icon, int count) {
@@ -315,6 +291,7 @@ bool Inventory::addItem(const std::string& itemName, SDL_Texture* icon, int coun
     int slotIndex = findSlotByItemName(itemName);
     if (slotIndex != -1) {
         slots[slotIndex].count += count;
+        SDL_Log("Inventory::addItem: Added %d %s to existing slot, new count: %d", count, itemName.c_str(), slots[slotIndex].count);
         return true;
     }
 
@@ -323,26 +300,35 @@ bool Inventory::addItem(const std::string& itemName, SDL_Texture* icon, int coun
         slots[slotIndex].itemName = itemName;
         slots[slotIndex].icon = icon;
         slots[slotIndex].count = count;
+        SDL_Log("Inventory::addItem: Added %d %s to empty slot %d", count, itemName.c_str(), slotIndex);
         return true;
     }
 
-    SDL_Log("Inventory is full! Cannot add %s", itemName.c_str());
+    SDL_Log("Inventory::addItem: Inventory is full! Cannot add %s", itemName.c_str());
     return false;
 }
 
 bool Inventory::removeItem(const std::string& itemName, int count) {
     int slotIndex = findSlotByItemName(itemName);
-    if (slotIndex == -1) return false;
+    if (slotIndex == -1) {
+        SDL_Log("Inventory::removeItem: Item '%s' not found", itemName.c_str());
+        return false;
+    }
 
     if (slots[slotIndex].count >= count) {
         slots[slotIndex].count -= count;
+        SDL_Log("Inventory::removeItem: Removed %d %s, remaining: %d", count, itemName.c_str(), slots[slotIndex].count);
+
         if (slots[slotIndex].count <= 0) {
             slots[slotIndex].itemName = "";
             slots[slotIndex].icon = nullptr;
             slots[slotIndex].count = 0;
+            SDL_Log("Inventory::removeItem: Slot %d is now empty", slotIndex);
         }
         return true;
     }
+
+    SDL_Log("Inventory::removeItem: Not enough %s (have %d, need %d)", itemName.c_str(), slots[slotIndex].count, count);
     return false;
 }
 
@@ -370,11 +356,8 @@ void Inventory::clear() {
 void Inventory::setSelectedSlot(int slotIndex) {
     if (slotIndex >= 0 && slotIndex < SLOT_COUNT) {
         selectedSlot = slotIndex;
+        SDL_Log("Inventory: Selected slot %d", slotIndex);
     }
-}
-
-void Inventory::setUseItemCallback(std::function<void(const std::string&, int)> callback) {
-    onUseItem = callback;
 }
 
 const InventorySlot* Inventory::getSelectedItem() const {
