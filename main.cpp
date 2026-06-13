@@ -45,53 +45,245 @@ SDL_Texture* skipTextTexture = nullptr;
 
 NPC1* dialogueNPC = nullptr;
 
-// Флаг для предотвращения повторного добавления амулета
+// Иконки предметов
+SDL_Texture* amuletIcon = nullptr;
+SDL_Texture* goldenFlowerIcon = nullptr;
+SDL_Texture* magicCrystalIcon = nullptr;
+
+// Квестовый предмет на карте
+struct QuestItem {
+    float x, y;
+    float width = 32.0f;
+    float height = 32.0f;
+    bool collected = false;
+    SDL_Texture* texture = nullptr;
+    std::string name;
+};
+
+QuestItem goldenFlower;
+
+// Флаги
 bool amuletReceived = false;
+
+// Вспомогательные функции для работы с инвентарём
+bool addItemToInventory(const std::string& itemName, int count) {
+    SDL_Texture* icon = nullptr;
+    if (itemName == "Magic Amulet") icon = amuletIcon;
+    else if (itemName == "Golden Flower") icon = goldenFlowerIcon;
+    else if (itemName == "Magic Crystal") icon = magicCrystalIcon;
+
+    if (icon) {
+        return playerInventory.addItem(itemName, icon, count);
+    }
+    return false;
+}
+
+bool removeItemFromInventory(const std::string& itemName, int count) {
+    return playerInventory.removeItem(itemName, count);
+}
+
+bool hasItemInInventory(const std::string& itemName) {
+    return playerInventory.hasItem(itemName);
+}
+
+// Создание текстуры-заглушки
+SDL_Texture* createPlaceholderTexture(SDL_Color color) {
+    SDL_Surface* surf = SDL_CreateSurface(32, 32, SDL_PIXELFORMAT_ARGB8888);
+    if (!surf) return nullptr;
+    SDL_FillSurfaceRect(surf, nullptr, SDL_MapSurfaceRGBA(surf, color.r, color.g, color.b, color.a));
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surf);
+    SDL_DestroySurface(surf);
+    return texture;
+}
+
+// Функция обработки диалога с NPC
+void handleNPCDialogue() {
+    if (!dialogueNPC || !dialogueNPC->isPlayerNear(player->worldX, player->worldY)) return;
+
+    // Если диалог уже активен - не создаём новый
+    if (dialogMgr.isActive()) return;
+
+    bool hasAmuletItem = hasItemInInventory("Magic Amulet");
+    bool hasFlowerItem = hasItemInInventory("Golden Flower");
+
+    // Квест сдан - финальный диалог (только один раз)
+    if (dialogueNPC->questRewarded) {
+        dialogMgr.show(
+            { "Спасибо! Магический кристалл поможет тебе в пути!" },
+            "", nullptr, "", nullptr,
+            dialogFont, renderer
+        );
+        // Устанавливаем флаг, чтобы больше не показывать этот диалог
+        dialogueNPC->questRewarded = false;
+        dialogueNPC->questCompleted = true;
+        return;
+    }
+
+    // Квест активен и есть цветок - сдаём квест
+    if (dialogueNPC->questActive && hasFlowerItem) {
+        dialogMgr.show(
+            dialogueNPC->questCompleteLines,
+            "Сдать квест(1)", [&]() {
+                removeItemFromInventory("Golden Flower", 1);
+                addItemToInventory("Magic Crystal", 1);
+                dialogueNPC->questRewarded = true;
+                dialogueNPC->questActive = false;
+                SDL_Log("Квест сдан! Получен магический кристалл!");
+            },
+            "Позже(2)", []() {},
+            dialogFont, renderer
+        );
+        return;
+    }
+
+    // Квест активен, но цветка нет
+    if (dialogueNPC->questActive && !hasFlowerItem) {
+        dialogMgr.show(
+            dialogueNPC->questProgressLines,
+            "", nullptr, "", nullptr,
+            dialogFont, renderer
+        );
+        return;
+    }
+
+    // Есть амулет и квест не начат и не завершён - предлагаем квест
+    if (hasAmuletItem && !dialogueNPC->questActive && !dialogueNPC->questCompleted && !dialogueNPC->questRewarded) {
+        dialogMgr.show(
+            dialogueNPC->questStartLines,
+            dialogueNPC->questOption1, [&]() {
+                dialogueNPC->questActive = true;
+                SDL_Log("Квест начат! Найдите Золотой Цветок!");
+            },
+            dialogueNPC->questOption2, []() {},
+            dialogFont, renderer
+        );
+        return;
+    }
+
+    // Нет амулета - первый диалог
+    if (!hasAmuletItem && !amuletReceived) {
+        dialogMgr.show(
+            dialogueNPC->dialogueLines,
+            dialogueNPC->option1, [&]() {
+                addItemToInventory("Magic Amulet", 1);
+                amuletReceived = true;
+                SDL_Log("Амулет получен!");
+            },
+            dialogueNPC->option2, []() {},
+            dialogFont, renderer
+        );
+        return;
+    }
+
+    // Если ничего не подошло - показываем обычный диалог
+    dialogMgr.show(
+        { "Будь осторожен в лесу, путник!" },
+        "", nullptr, "", nullptr,
+        dialogFont, renderer
+    );
+}
+// Инициализация квестового предмета
+void initQuestItem() {
+    goldenFlower.x = 1200.0f;
+    goldenFlower.y = 800.0f;
+    goldenFlower.width = 32.0f;
+    goldenFlower.height = 32.0f;
+    goldenFlower.collected = false;
+    goldenFlower.name = "Golden Flower";
+
+    goldenFlower.texture = IMG_LoadTexture(renderer, "assets/items/golden_flower.png");
+    if (!goldenFlower.texture) {
+        goldenFlower.texture = createPlaceholderTexture({ 255, 215, 0, 255 });
+    }
+}
+
+// Отрисовка квестового предмета
+void drawQuestItem(float camX, float camY, float zoom) {
+    if (goldenFlower.collected) return;
+    if (!goldenFlower.texture) return;
+
+    float screenX = (goldenFlower.x - camX) * zoom;
+    float screenY = (goldenFlower.y - camY) * zoom;
+    float screenW = goldenFlower.width * zoom;
+    float screenH = goldenFlower.height * zoom;
+
+    static float pulse = 0.0f;
+    pulse += 0.05f;
+    float scale = 1.0f + sin(pulse) * 0.1f;
+
+    SDL_FRect dest = {
+        screenX - (goldenFlower.width * (scale - 1.0f) / 2.0f),
+        screenY - (goldenFlower.height * (scale - 1.0f) / 2.0f),
+        screenW * scale,
+        screenH * scale
+    };
+
+    SDL_RenderTexture(renderer, goldenFlower.texture, nullptr, &dest);
+}
+
+// Проверка подбора предмета
+void checkQuestItemPickup() {
+    if (goldenFlower.collected) return;
+    if (!dialogueNPC->questActive) return;
+
+    float playerCenterX = player->worldX + 32.0f;
+    float playerCenterY = player->worldY + 64.0f;
+    float itemCenterX = goldenFlower.x + goldenFlower.width / 2.0f;
+    float itemCenterY = goldenFlower.y + goldenFlower.height / 2.0f;
+
+    float dx = playerCenterX - itemCenterX;
+    float dy = playerCenterY - itemCenterY;
+    float dist = sqrt(dx * dx + dy * dy);
+
+    if (dist < 50.0f) {
+        goldenFlower.collected = true;
+        addItemToInventory("Golden Flower", 1);
+        SDL_Log("Вы нашли Золотой Цветок!");
+
+        dialogMgr.show(
+            { "Вы нашли Золотой Цветок!" },
+            "", nullptr, "", nullptr,
+            dialogFont, renderer
+        );
+    }
+}
 
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
     SDL_CreateWindowAndRenderer("beautiful_garden", 1920, 1080, 0, &window, &renderer);
-    pauseMenu.setWindow(window);
     TTF_Init();
 
-    // Инициализация аудио
     audioManager.init();
 
-    // Загрузка шрифтов
     menuFont = TTF_OpenFont("assets/Banty Bold.ttf", 72);
-    if (!menuFont) SDL_Log("Ошибка загрузки menuFont: %s", SDL_GetError());
-
     dialogFont = TTF_OpenFont("assets/DejaVuSans.ttf", 48);
-    if (!dialogFont) SDL_Log("Ошибка загрузки dialogFont: %s", SDL_GetError());
 
-    // Инициализация инвентаря
-    if (!playerInventory.init(renderer, dialogFont, "assets/inventory/slot.png")) {
-        SDL_Log("Ошибка инициализации инвентаря!");
-    }
+    playerInventory.init(renderer, dialogFont, "assets/inventory/slot.png");
+    pauseMenu.init(renderer, dialogFont);
+    pauseMenu.setWindow(window);
 
-    // Инициализация меню паузы
-    if (!pauseMenu.init(renderer, dialogFont)) {
-        SDL_Log("Ошибка инициализации меню паузы!");
-    }
+    // Загрузка иконок
+    amuletIcon = IMG_LoadTexture(renderer, "assets/items/amulet.png");
+    if (!amuletIcon) amuletIcon = createPlaceholderTexture({ 100, 100, 255, 255 });
 
-    // Настройка колбэков для меню паузы
-    pauseMenu.setVolumeCallback([&](float volume) {
-        audioManager.setVolume(volume);
-        });
+    goldenFlowerIcon = IMG_LoadTexture(renderer, "assets/items/golden_flower.png");
+    if (!goldenFlowerIcon) goldenFlowerIcon = createPlaceholderTexture({ 255, 215, 0, 255 });
 
+    magicCrystalIcon = IMG_LoadTexture(renderer, "assets/items/magic_crystal.png");
+    if (!magicCrystalIcon) magicCrystalIcon = createPlaceholderTexture({ 100, 150, 255, 255 });
+
+    pauseMenu.setVolumeCallback([&](float volume) { audioManager.setVolume(volume); });
     pauseMenu.setExitToMenuCallback([&]() {
         gameState = STATE_MENU;
         audioManager.stopMusic();
         audioManager.playMusic("assets/audio/Playboi-Carti-magnolia.wav", -1);
         });
-
     pauseMenu.setExitToDesktopCallback([&]() {
         SDL_Event quitEvent;
         quitEvent.type = SDL_EVENT_QUIT;
         SDL_PushEvent(&quitEvent);
         });
 
-    // Создание текстур UI
     SDL_Color white = { 255, 255, 255, 255 };
     SDL_Surface* surf = TTF_RenderText_Blended(menuFont, "Press ENTER to start", 0, white);
     if (surf) {
@@ -104,28 +296,16 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
         skipTextTexture = SDL_CreateTextureFromSurface(renderer, surf);
         SDL_DestroySurface(surf);
     }
-    else {
-        SDL_Log("Ошибка создания skip-текстуры: %s", SDL_GetError());
-    }
 
-    // Загрузка фоновых текстур
     menuBackground = IMG_LoadTexture(renderer, "assets/images/enter.png");
-    if (!menuBackground) SDL_Log("Фон меню не загружен: %s", SDL_GetError());
-
     disclaimerBG = IMG_LoadTexture(renderer, "assets/images/dis.png");
-    if (!disclaimerBG) SDL_Log("Дисклеймер не загружен: %s", SDL_GetError());
-
     extraImage = IMG_LoadTexture(renderer, "assets/images/beg.png");
-    if (!extraImage) SDL_Log("Доп. картинка не загружена: %s", SDL_GetError());
 
     // Создание NPC и игрока
     dialogueNPC = new NPC1(renderer, "assets/NPC/idle(64x64).png", 550.0f, 400.0f);
-    dialogueNPC->dialogueLines = {
-        "Привет! Ты попал на чудо остров!",
-        "Хочешь, подарю тебе амулет?"
-    };
-    dialogueNPC->option1 = "Да(1)";
-    dialogueNPC->option2 = "Нет(2)";
+    dialogueNPC->setHasItemCallback(hasItemInInventory);
+    dialogueNPC->setRemoveItemCallback(removeItemFromInventory);
+    dialogueNPC->setAddItemCallback(addItemToInventory);
 
     player = new Player(renderer, "assets/player/split.png");
     player->worldX = 500.0f;
@@ -133,19 +313,14 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 
     // Загрузка карты
     tileMap = new TileMap();
-    if (!tileMap->loadFromJSON("assets/map/1234.json")) {
-        SDL_Log("Ошибка загрузки карты!");
-        return SDL_APP_FAILURE;
-    }
-    if (!tileMap->loadTilesetTexture(renderer, "assets/Texture/TX Plant.png")) {
-        SDL_Log("Ошибка загрузки тайлсета!");
-    }
-    if (tileMap) {
-        player->setWorldBounds(
-            tileMap->mapWidth * tileMap->tileWidth,
-            tileMap->mapHeight * tileMap->tileHeight
-        );
-    }
+    tileMap->loadFromJSON("assets/map/1234.json");
+    tileMap->loadTilesetTexture(renderer, "assets/Texture/TX Plant.png");
+    player->setWorldBounds(
+        tileMap->mapWidth * tileMap->tileWidth,
+        tileMap->mapHeight * tileMap->tileHeight
+    );
+
+    initQuestItem();
 
     return SDL_APP_CONTINUE;
 }
@@ -154,13 +329,11 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
     if (event->type == SDL_EVENT_QUIT)
         return SDL_APP_SUCCESS;
 
-    // Обработка дисклеймера
     if (gameState == STATE_DISCLAIMER) {
         if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_RETURN)
             gameState = STATE_EXTRA;
         return SDL_APP_CONTINUE;
     }
-    // Обработка экрана EXTRA
     else if (gameState == STATE_EXTRA) {
         if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_RETURN) {
             gameState = STATE_MENU;
@@ -168,7 +341,6 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         }
         return SDL_APP_CONTINUE;
     }
-    // Обработка главного меню
     else if (gameState == STATE_MENU) {
         if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_RETURN) {
             gameState = STATE_GAME;
@@ -176,14 +348,13 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             audioManager.playMusic("assets/audio/korolevskij_XVII_-_1_5__SkySound.cc__1.wav", -1);
             camera.zoom = 1.75f;
             camera.update(player->worldX + 32.0f, player->worldY + 64.0f,
-                static_cast<float>(tileMap->mapWidth * tileMap->tileWidth),
-                static_cast<float>(tileMap->mapHeight * tileMap->tileHeight));
+                (float)(tileMap->mapWidth * tileMap->tileWidth),
+                (float)(tileMap->mapHeight * tileMap->tileHeight));
         }
         return SDL_APP_CONTINUE;
     }
-    // Обработка игры
     else if (gameState == STATE_GAME) {
-        // Обработка ESC для открытия/закрытия меню паузы
+        // ESC для меню паузы
         if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_ESCAPE) {
             if (pauseMenu.isOpen()) {
                 pauseMenu.close();
@@ -194,53 +365,29 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
             return SDL_APP_CONTINUE;
         }
 
-        // Если меню паузы открыто - отправляем события в него
         if (pauseMenu.isOpen()) {
             pauseMenu.handleEvent(*event);
             return SDL_APP_CONTINUE;
         }
 
-        // Остальная обработка игры (только когда меню закрыто)
         player->handleEvents();
-        dialogueNPC->handleEvents();
 
         if (event->type == SDL_EVENT_KEY_DOWN) {
-            // Если диалог в режиме выбора – реагируем на 1 и 2
+            // Выбор в диалоге
             if (dialogMgr.isActive() && dialogMgr.isWaitingChoice()) {
                 if (event->key.key == SDLK_1) {
                     dialogMgr.handleChoice(1);
                     audioManager.playMusic("assets/audio/korolevskij_XVII_-_1_5__SkySound.cc__1.wav", -1);
-
-                    // Добавляем амулет в инвентарь (только один раз)
-                    if (!amuletReceived) {
-                        SDL_Texture* amuletIcon = IMG_LoadTexture(renderer, "assets/items/amulet.png");
-                        if (amuletIcon) {
-                            playerInventory.addItem("Magic Amulet", amuletIcon, 1);
-                            SDL_Log("Вы получили магический амулет!");
-                            amuletReceived = true;
-                        }
-                        else {
-                            SDL_Log("Не удалось загрузить текстуру амулета: %s", SDL_GetError());
-                        }
-                    }
                 }
                 else if (event->key.key == SDLK_2) {
                     dialogMgr.handleChoice(2);
                     audioManager.playMusic("assets/audio/korolevskij_XVII_-_1_5__SkySound.cc__1.wav", -1);
                 }
             }
-            // Обычный диалог (E)
+            // Диалог (E)
             else if (event->key.key == SDLK_E) {
                 if (!dialogMgr.isActive()) {
-                    if (dialogueNPC && dialogueNPC->isPlayerNear(player->worldX, player->worldY)) {
-                        dialogMgr.show(
-                            dialogueNPC->dialogueLines,
-                            dialogueNPC->option1, [&]() { dialogueNPC->gaveItem = true; },
-                            dialogueNPC->option2, [&]() { dialogueNPC->gaveItem = false; },
-                            dialogFont, renderer
-                        );
-                        audioManager.playMusic("assets/audio/Playboi-Carti-Molly.wav", -1);
-                    }
+                    handleNPCDialogue();
                 }
                 else {
                     dialogMgr.next();
@@ -249,20 +396,16 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
                     }
                 }
             }
-            // Управление инвентарём (цифры 1-8)
+            // Инвентарь (1-8)
             else if (event->key.key >= SDLK_1 && event->key.key <= SDLK_8) {
                 int slot = event->key.key - SDLK_1;
                 playerInventory.setSelectedSlot(slot);
             }
-            // Использование предмета (клавиша F)
+            // Использование предмета (F)
             else if (event->key.key == SDLK_F) {
                 const InventorySlot* item = playerInventory.getSelectedItem();
                 if (item) {
                     SDL_Log("Used item: %s x%d", item->itemName.c_str(), item->count);
-                    if (item->itemName == "Magic Amulet") {
-                        SDL_Log("You used the amulet! You feel magical power!");
-                        playerInventory.removeItem(item->itemName, 1);
-                    }
                 }
             }
         }
@@ -273,17 +416,12 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 }
 
 SDL_AppResult SDL_AppIterate(void* appstate) {
-    // Очистка экрана
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    // Обновление аудио каждый кадр (для зацикливания)
     audioManager.update();
-
-    // Обновление меню паузы
     pauseMenu.update(0.016f);
 
-    // Отрисовка в зависимости от состояния
     if (gameState == STATE_MENU) {
         if (menuBackground) {
             SDL_FRect dest = { 0, 0, 1920, 1080 };
@@ -321,32 +459,25 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
         }
     }
     else if (gameState == STATE_GAME) {
-        // Обновление камеры
         camera.update(player->worldX + 32.0f, player->worldY + 64.0f,
-            static_cast<float>(tileMap->mapWidth * tileMap->tileWidth),
-            static_cast<float>(tileMap->mapHeight * tileMap->tileHeight));
+            (float)(tileMap->mapWidth * tileMap->tileWidth),
+            (float)(tileMap->mapHeight * tileMap->tileHeight));
 
-        // Отрисовка карты
         tileMap->render(renderer, camera.x, camera.y, camera.zoom);
+        drawQuestItem(camera.x, camera.y, camera.zoom);
+        checkQuestItemPickup();
 
-        // Отрисовка NPC
         if (dialogueNPC) {
             dialogueNPC->update();
             dialogueNPC->draw(camera.x, camera.y, camera.zoom);
         }
 
-        // Отрисовка игрока
         player->update();
         player->draw(camera.x, camera.y, camera.zoom);
-
-        // Отрисовка диалога
         dialogMgr.draw(renderer);
-
-        // Отрисовка меню паузы (если открыто)
         pauseMenu.draw(1920.0f, 1080.0f);
     }
 
-    // Отрисовка инвентаря (всегда поверх всего, кроме меню паузы)
     if (gameState == STATE_GAME && !pauseMenu.isOpen()) {
         playerInventory.draw(1920.0f, 1080.0f);
     }
@@ -359,18 +490,22 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 void SDL_AppQuit(void* appstate, SDL_AppResult result) {
     delete tileMap;
 
-    // Очистка текстур UI
     if (menuBackground) SDL_DestroyTexture(menuBackground);
     if (menuTextTexture) SDL_DestroyTexture(menuTextTexture);
     if (disclaimerBG) SDL_DestroyTexture(disclaimerBG);
     if (extraImage) SDL_DestroyTexture(extraImage);
     if (skipTextTexture) SDL_DestroyTexture(skipTextTexture);
 
-    // Очистка шрифтов
+    if (amuletIcon) SDL_DestroyTexture(amuletIcon);
+    if (goldenFlowerIcon) SDL_DestroyTexture(goldenFlowerIcon);
+    if (magicCrystalIcon) SDL_DestroyTexture(magicCrystalIcon);
+    if (goldenFlower.texture && goldenFlower.texture != goldenFlowerIcon) {
+        SDL_DestroyTexture(goldenFlower.texture);
+    }
+
     if (menuFont) TTF_CloseFont(menuFont);
     if (dialogFont) TTF_CloseFont(dialogFont);
 
-    // Очистка игровых объектов
     delete dialogueNPC;
     delete player;
 

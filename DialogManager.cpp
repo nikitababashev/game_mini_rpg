@@ -42,10 +42,16 @@ void DialogManager::next() {
         createTexture(lines[currentLine]);
     }
     else {
-        // Все фразы показаны — переходим к выбору
-        waitingChoice = true;
-        std::string combined = choice1Text + "   или   " + choice2Text;
-        createTexture(combined);
+        // Если есть варианты выбора - показываем их
+        if (!choice1Text.empty() || !choice2Text.empty()) {
+            waitingChoice = true;
+            std::string combined = choice1Text + "   или   " + choice2Text;
+            createTexture(combined);
+        }
+        else {
+            // Нет вариантов выбора - просто закрываем диалог
+            hide();
+        }
     }
 }
 
