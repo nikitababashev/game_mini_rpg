@@ -15,10 +15,12 @@
 #include "Camera.h"
 #include "DialogManager.h"
 #include "AudioManager.h"
+#include "Inventory.h"
 
 using json = nlohmann::json;
 
 // Глобальные объекты
+static Inventory playerInventory;
 static SDL_Window* window = nullptr;
 static SDL_Renderer* renderer = nullptr;
 
@@ -54,6 +56,9 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 
     dialogFont = TTF_OpenFont("assets/DejaVuSans.ttf", 48);
     if (!dialogFont) SDL_Log("Ошибка загрузки dialogFont: %s", SDL_GetError());
+    if (!playerInventory.init(renderer, dialogFont, "assets/inventory/slot.png")) {
+        SDL_Log("Ошибка инициализации инвентаря!");
+    }
 
     SDL_Color white = { 255, 255, 255, 255 };
     SDL_Surface* surf = TTF_RenderText_Blended(menuFont, "Press ENTER to start", 0, white);
@@ -142,7 +147,6 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         dialogueNPC->handleEvents();
 
         if (event->type == SDL_EVENT_KEY_DOWN) {
-            // Если диалог в режиме выбора – реагируем на 1 и 2
             if (dialogMgr.isActive() && dialogMgr.isWaitingChoice()) {
                 if (event->key.key == SDLK_1) {
                     dialogMgr.handleChoice(1);
@@ -153,14 +157,25 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
                     audioManager.playMusic("assets/audio/korolevskij_XVII_-_1_5__SkySound.cc__1.wav", -1);
                 }
             }
-            // Обычный диалог (E)
             else if (event->key.key == SDLK_E) {
                 if (!dialogMgr.isActive()) {
                     if (dialogueNPC && dialogueNPC->isPlayerNear(player->worldX, player->worldY)) {
                         dialogMgr.show(
                             dialogueNPC->dialogueLines,
-                            dialogueNPC->option1, [&]() { dialogueNPC->gaveItem = true; },
-                            dialogueNPC->option2, [&]() { dialogueNPC->gaveItem = false; },
+                            dialogueNPC->option1,
+                            [&]() {
+                                dialogueNPC->gaveItem = true;
+                                // ДОБАВЛЯЕМ АМУЛЕТ
+                                SDL_Texture* amuletIcon = IMG_LoadTexture(renderer, "assets/items/amulet.png");
+                                if (amuletIcon) {
+                                    playerInventory.addItem("Magic Amulet", amuletIcon, 1);
+                                    SDL_Log("Амулет добавлен в инвентарь!");
+                                }
+                            },
+                            dialogueNPC->option2,
+                            [&]() {
+                                dialogueNPC->gaveItem = false;
+                            },
                             dialogFont, renderer
                         );
                         audioManager.playMusic("assets/audio/Playboi-Carti-Molly.wav", -1);
@@ -173,9 +188,26 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
                     }
                 }
             }
+
+            // Управление инвентарём
+            else if (event->key.key >= SDLK_1 && event->key.key <= SDLK_8) {
+                int slot = event->key.key - SDLK_1;
+                playerInventory.setSelectedSlot(slot);
+            }
+            else if (event->key.key == SDLK_F) {
+                const InventorySlot* item = playerInventory.getSelectedItem();
+                if (item) {
+                    SDL_Log("Used item: %s x%d", item->itemName.c_str(), item->count);
+                    if (item->itemName == "Magic Amulet") {
+                        SDL_Log("You used the amulet! You feel magical power!");
+                        playerInventory.removeItem(item->itemName, 1);
+                    }
+                }
+            }
         }
         return SDL_APP_CONTINUE;
     }
+
 
     return SDL_APP_CONTINUE;
 }
@@ -239,7 +271,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 
         dialogMgr.draw(renderer);
     }
-
+    playerInventory.draw(1920.0f, 1080.0f);
     SDL_RenderPresent(renderer);
     SDL_Delay(16);
     return SDL_APP_CONTINUE;
@@ -262,7 +294,7 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result) {
 
     TTF_Quit();
     audioManager.cleanup();
-
+    playerInventory.cleanup();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

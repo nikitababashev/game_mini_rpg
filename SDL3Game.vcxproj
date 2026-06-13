@@ -153,6 +153,7 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="DialogManager.cpp" />
     <ClCompile Include="GameState.cpp" />
+    <ClCompile Include="Inventory.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="NPC.cpp" />
     <ClCompile Include="NPC1.cpp" />
@@ -165,6 +166,7 @@
     <ClInclude Include="Camera.h" />
     <ClInclude Include="DialogManager.h" />
     <ClInclude Include="GameState.h" />
+    <ClInclude Include="Inventory.h" />
     <ClInclude Include="NPC.h" />
     <ClInclude Include="NPC1.h" />
     <ClInclude Include="Player.h" />
