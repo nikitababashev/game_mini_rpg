@@ -124,3 +124,9 @@ void AudioManager::update() {
         }
     }
 }
+void AudioManager::setVolume(float volume) {
+    currentVolume = std::max(0.0f, std::min(1.0f, volume));
+    if (stream) {
+        SDL_SetAudioStreamGain(stream, currentVolume);
+    }
+}

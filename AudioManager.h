@@ -9,10 +9,12 @@ public:
 
     bool playMusic(const std::string& path, int loops = -1);
     void stopMusic();
+    void setVolume(float volume);
     void update();               // нужно вызывать каждый кадр
     bool isMusicPlaying() const;
 
 private:
+    float currentVolume = 1.0f;
     SDL_AudioDeviceID device = 0;
     SDL_AudioStream* stream = nullptr;
     Uint8* wavBuffer = nullptr;
