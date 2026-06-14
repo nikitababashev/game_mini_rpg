@@ -17,7 +17,7 @@ void Player::draw(float camX, float camY, float zoom) {
 		(worldX - camX) * zoom,
 		(worldY - camY) * zoom,
 		64.0f * zoom,   // ширина персонажа
-		128.0f * zoom   // высота персонажа
+		64.0f * zoom   // высота персонажа
 	};
 	SDL_RenderTexture(renderer, texture, &src, &dest);
 }
@@ -26,8 +26,8 @@ void Player::showAnimation(animation animation, int now, int delay) {
 	if (delay >= animation.animationDelay) {
 		lastUpdate = now;
 		currentIndex = (currentIndex + 1) % animation.frames;
-		src.x = currentIndex * 64;
-		src.y = 128 * animation.y;
+		src.x = startX + currentIndex * 74;
+		src.y = startY + 64 * animation.y;
 	}
 }
 void Player::update() {
@@ -87,7 +87,7 @@ void Player::update() {
 		}
 	}
 	if (worldW > 0 && worldH > 0) {
-		float halfW = 32.0f;   // половина ширины спрайта (64/2)
+		float halfW = 64.0f;   // половина ширины спрайта (64/2)
 		float halfH = 64.0f;   // половина высоты спрайта (128/2)
 
 		if (worldX - halfW < 0.0f) worldX = halfW;
@@ -97,10 +97,10 @@ void Player::update() {
 	}
 }
 void Player::initAnimations() {
-	animations.idle_w = { 8, 100, 0 };
-	animations.idle_a = { 8, 100, 1 };
-	animations.idle_d = { 8, 100, 2 };
-	animations.idle_s = { 8, 100, 3 };
+	animations.idle_w = { 1, 100, 0 };
+	animations.idle_a = { 1, 100, 0 };
+	animations.idle_d = { 1, 100, 0 };
+	animations.idle_s = { 1, 100, 1 };
 
 	animations.walk_w = { 10, 100, 4 };
 	animations.walk_a = { 10, 100, 5 };
@@ -123,8 +123,8 @@ Player::Player(SDL_Renderer* renderer, std::string texturePath) : renderer(rende
 	initAnimations();
 	sizeSprite = 64;
 	texture = IMG_LoadTexture(renderer, texturePath.c_str());
-	dest = { 500, 400, 64 , 64 * 2 };//где и какого размера рисовать
-	src = { 0, 0, 64, 64 * 2 };//часть текстуры
+	dest = { 500, 400, 64 , 64 };//где и какого размера рисовать
+	src = { startX, startY, 64, 64 };
 	walk_speed = 5;
 	speed = 2;
 

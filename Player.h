@@ -27,6 +27,8 @@ struct animationData {//новый тип данных
 class Player
 {
 public:
+	float startX = 18;   // подставь сюда координату X первого кадра idle
+	float startY = 4.5;    // подставь сюда координату Y первого кадра idle
 	Player(SDL_Renderer* renderer, std::string texturePath);
 	void draw(float camX, float camY, float zoom);
 	void update();
@@ -34,6 +36,8 @@ public:
 	float worldX = 0.0f;
 	void setWorldBounds(float w, float h);
 	float worldY = 0.0f;
+	float offsetX = 0.0f;   // смещение всей сетки анимаций по X (если кадры не с левого края)
+	float offsetY = 0.0f;   // смещение всей сетки анимаций по Y (если кадры не с верхнего края)
 	~Player();
 
 private:
