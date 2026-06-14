@@ -122,7 +122,7 @@ void handleNPCDialogue() {
 
     if (dialogueNPC->questCompleted) {
         dialogMgr.show(
-            { "Thanks for your help! Come again!" },
+            { "Спасибо за помощь! Заходи ещё!" },
             "", nullptr, "", nullptr,
             dialogFont, renderer
         );
@@ -131,7 +131,7 @@ void handleNPCDialogue() {
 
     if (dialogueNPC->questRewarded) {
         dialogMgr.show(
-            { "Thank you! The magic crystal will help you on your journey!" },
+            { "Спасибо! Магический кристалл поможет тебе в пути!" },
             "", nullptr, "", nullptr,
             dialogFont, renderer
         );
@@ -143,14 +143,14 @@ void handleNPCDialogue() {
     if (dialogueNPC->questActive && hasFlowerItem) {
         dialogMgr.show(
             dialogueNPC->questCompleteLines,
-            "Complete Quest(1)", [&]() {
+            "Сдать квест(1)", [&]() {
                 removeItemFromInventory("Golden Flower", 1);
                 addItemToInventory("Magic Crystal", 1);
                 dialogueNPC->questRewarded = true;
                 dialogueNPC->questActive = false;
-                SDL_Log("Quest completed! Magic Crystal received!");
+                SDL_Log("Квест завершён! Получен магический кристалл!");
             },
-            "Later(2)", []() {},
+            "Позже(2)", []() {},
             dialogFont, renderer
         );
         return;
@@ -170,7 +170,7 @@ void handleNPCDialogue() {
             dialogueNPC->questStartLines,
             dialogueNPC->questOption1, [&]() {
                 dialogueNPC->questActive = true;
-                SDL_Log("Quest started! Find the Golden Flower!");
+                SDL_Log("Квест начат! Найдите Золотой Цветок!");
             },
             dialogueNPC->questOption2, []() {},
             dialogFont, renderer
@@ -184,7 +184,7 @@ void handleNPCDialogue() {
             dialogueNPC->option1, [&]() {
                 addItemToInventory("Magic Amulet", 1);
                 amuletReceived = true;
-                SDL_Log("Amulet received!");
+                SDL_Log("Амулет получен!");
             },
             dialogueNPC->option2, []() {},
             dialogFont, renderer
@@ -193,7 +193,7 @@ void handleNPCDialogue() {
     }
 
     dialogMgr.show(
-        { "Be careful in the forest, traveler!" },
+        { "Будь осторожен в лесу, путник!" },
         "", nullptr, "", nullptr,
         dialogFont, renderer
     );
@@ -258,7 +258,7 @@ void checkQuestItemPickup() {
         SDL_Log("You found the Golden Flower!");
 
         dialogMgr.show(
-            { "You found the Golden Flower! Return to the NPC." },
+            { "Вы нашли Золотой Цветок! Вернитесь к NPC." },
             "", nullptr, "", nullptr,
             dialogFont, renderer
         );
