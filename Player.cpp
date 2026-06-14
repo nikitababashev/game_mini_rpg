@@ -16,8 +16,8 @@ void Player::draw(float camX, float camY, float zoom) {
     SDL_FRect dest = {
         (worldX - camX) * zoom,
         (worldY - camY) * zoom,
-        64.0f * zoom,
-        128.0f * zoom
+        48.0f * zoom,
+        96.0f * zoom
     };
     SDL_RenderTexture(renderer, texture, &src, &dest);
 }
@@ -26,8 +26,8 @@ void Player::showAnimation(animation animation, int now, int delay) {
     if (delay >= animation.animationDelay) {
         lastUpdate = now;
         currentIndex = (currentIndex + 1) % animation.frames;
-        src.x = currentIndex * 64;
-        src.y = 128 * animation.y;
+        src.x = currentIndex * 48;
+        src.y = 96 * animation.y;
     }
 }
 
@@ -111,16 +111,16 @@ void Player::initAnimations() {
 
     animations.run_w = { 12, 100, 8 };
     animations.run_a = { 12, 100, 9 };
-    animations.run_d = { 12, 100, 10 };
-    animations.run_s = { 12, 100, 11 };
+    animations.run_d = { 12, 100, 10};
+    animations.run_s = { 12, 100, 11};
 }
 
 Player::Player(SDL_Renderer* renderer, const std::string& texturePath) : renderer(renderer) {
     initAnimations();
-    sizeSprite = 64;
+    sizeSprite = 48;
     texture = IMG_LoadTexture(renderer, texturePath.c_str());
-    dest = { 500, 400, 64 , 64 * 2 };
-    src = { 0, 0, 64, 64 * 2 };
+    dest = { 500, 400, 48 , 48 * 2 };
+    src = { 0, 0, 48, 96 };
     walk_speed = 5;
     speed = 2;
 }
