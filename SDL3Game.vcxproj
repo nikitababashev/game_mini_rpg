@@ -151,6 +151,7 @@
   <ItemGroup>
     <ClCompile Include="AudioManager.cpp" />
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="CharacterSelect.cpp" />
     <ClCompile Include="DialogManager.cpp" />
     <ClCompile Include="GameState.cpp" />
     <ClCompile Include="Inventory.cpp" />
@@ -165,6 +166,7 @@
   <ItemGroup>
     <ClInclude Include="AudioManager.h" />
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="CharacterSelect.h" />
     <ClInclude Include="DialogManager.h" />
     <ClInclude Include="GameState.h" />
     <ClInclude Include="Inventory.h" />

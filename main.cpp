@@ -4,7 +4,6 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <cmath>
 #include <SDL3_image/SDL_image.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include "Player.h"
@@ -18,12 +17,14 @@
 #include "AudioManager.h"
 #include "Inventory.h"
 #include "PauseMenu.h"
+#include "CharacterSelect.h"
 
 using json = nlohmann::json;
 
 // Глобальные объекты
 static Inventory playerInventory;
 static PauseMenu pauseMenu;
+static CharacterSelect characterSelect;
 static SDL_Window* window = nullptr;
 static SDL_Renderer* renderer = nullptr;
 
@@ -39,7 +40,6 @@ TileMap* tileMap = nullptr;
 SDL_Texture* menuBackground = nullptr;
 TTF_Font* menuFont = nullptr;
 TTF_Font* dialogFont = nullptr;
-TTF_Font* cutsceneFont = nullptr;
 SDL_Texture* menuTextTexture = nullptr;
 SDL_Texture* disclaimerBG = nullptr;
 SDL_Texture* extraImage = nullptr;
@@ -51,6 +51,10 @@ NPC1* dialogueNPC = nullptr;
 SDL_Texture* amuletIcon = nullptr;
 SDL_Texture* goldenFlowerIcon = nullptr;
 SDL_Texture* magicCrystalIcon = nullptr;
+
+// Текстуры для выбора пола
+SDL_Texture* malePlayerTexture = nullptr;
+SDL_Texture* femalePlayerTexture = nullptr;
 
 // Квестовый предмет на карте
 struct QuestItem {
@@ -66,26 +70,8 @@ QuestItem goldenFlower;
 
 // Флаги
 bool amuletReceived = false;
-
-// -------- Катсцены (между актами) --------
-std::vector<std::string> cutsceneLines;
-size_t cutsceneLineIndex = 0;
-SDL_Texture* fullLineTexture = nullptr;      // полная текстура текущей строки
-std::string lastLine;                        // последняя отрисованная строка (для отслеживания смены)
-float cutsceneCharTimer = 0.0f;
-int cutsceneVisibleChars = 0;
-const float CUTSCENE_CHAR_SPEED = 60.0f;     // символов в секунду
-
-void startCutscene(const std::vector<std::string>& lines) {
-    cutsceneLines = lines;
-    cutsceneLineIndex = 0;
-    cutsceneCharTimer = 0.0f;
-    cutsceneVisibleChars = 0;
-    // Останавливаем игровую музыку, если нужно
-    audioManager.stopMusic();
-    // Можно запустить музыку катсцены: audioManager.playMusic("...", -1);
-    gameState = STATE_CUTSCENE;
-}
+bool waitingForCharacterSelect = false;
+CharacterGender currentGender = CharacterGender::MALE;
 
 // Вспомогательные функции для работы с инвентарём
 bool addItemToInventory(const std::string& itemName, int count) {
@@ -101,7 +87,14 @@ bool addItemToInventory(const std::string& itemName, int count) {
 }
 
 bool removeItemFromInventory(const std::string& itemName, int count) {
-    return playerInventory.removeItem(itemName, count);
+    bool result = playerInventory.removeItem(itemName, count);
+    if (result) {
+        SDL_Log("removeItemFromInventory: Removed %d x %s", count, itemName.c_str());
+    }
+    else {
+        SDL_Log("removeItemFromInventory: Failed to remove %s", itemName.c_str());
+    }
+    return result;
 }
 
 bool hasItemInInventory(const std::string& itemName) {
@@ -127,9 +120,18 @@ void handleNPCDialogue() {
     bool hasAmuletItem = hasItemInInventory("Magic Amulet");
     bool hasFlowerItem = hasItemInInventory("Golden Flower");
 
+    if (dialogueNPC->questCompleted) {
+        dialogMgr.show(
+            { "Thanks for your help! Come again!" },
+            "", nullptr, "", nullptr,
+            dialogFont, renderer
+        );
+        return;
+    }
+
     if (dialogueNPC->questRewarded) {
         dialogMgr.show(
-            { "Спасибо! Магический кристалл поможет тебе в пути!" },
+            { "Thank you! The magic crystal will help you on your journey!" },
             "", nullptr, "", nullptr,
             dialogFont, renderer
         );
@@ -141,13 +143,14 @@ void handleNPCDialogue() {
     if (dialogueNPC->questActive && hasFlowerItem) {
         dialogMgr.show(
             dialogueNPC->questCompleteLines,
-            "Сдать квест(1)", [&]() {
+            "Complete Quest(1)", [&]() {
                 removeItemFromInventory("Golden Flower", 1);
                 addItemToInventory("Magic Crystal", 1);
                 dialogueNPC->questRewarded = true;
                 dialogueNPC->questActive = false;
+                SDL_Log("Quest completed! Magic Crystal received!");
             },
-            "Позже(2)", []() {},
+            "Later(2)", []() {},
             dialogFont, renderer
         );
         return;
@@ -165,7 +168,10 @@ void handleNPCDialogue() {
     if (hasAmuletItem && !dialogueNPC->questActive && !dialogueNPC->questCompleted && !dialogueNPC->questRewarded) {
         dialogMgr.show(
             dialogueNPC->questStartLines,
-            dialogueNPC->questOption1, [&]() { dialogueNPC->questActive = true; },
+            dialogueNPC->questOption1, [&]() {
+                dialogueNPC->questActive = true;
+                SDL_Log("Quest started! Find the Golden Flower!");
+            },
             dialogueNPC->questOption2, []() {},
             dialogFont, renderer
         );
@@ -178,6 +184,7 @@ void handleNPCDialogue() {
             dialogueNPC->option1, [&]() {
                 addItemToInventory("Magic Amulet", 1);
                 amuletReceived = true;
+                SDL_Log("Amulet received!");
             },
             dialogueNPC->option2, []() {},
             dialogFont, renderer
@@ -186,7 +193,7 @@ void handleNPCDialogue() {
     }
 
     dialogMgr.show(
-        { "Будь осторожен в лесу, путник!" },
+        { "Be careful in the forest, traveler!" },
         "", nullptr, "", nullptr,
         dialogFont, renderer
     );
@@ -243,13 +250,15 @@ void checkQuestItemPickup() {
 
     float dx = playerCenterX - itemCenterX;
     float dy = playerCenterY - itemCenterY;
-    float dist = sqrt(dx * dx + dy * dy);
+    float dist = (float)sqrt(dx * dx + dy * dy);
 
     if (dist < 50.0f) {
         goldenFlower.collected = true;
         addItemToInventory("Golden Flower", 1);
+        SDL_Log("You found the Golden Flower!");
+
         dialogMgr.show(
-            { "Вы нашли Золотой Цветок!" },
+            { "You found the Golden Flower! Return to the NPC." },
             "", nullptr, "", nullptr,
             dialogFont, renderer
         );
@@ -258,14 +267,13 @@ void checkQuestItemPickup() {
 
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
-    SDL_CreateWindowAndRenderer("MORVEIN", 1920, 1080, 0, &window, &renderer);
+    SDL_CreateWindowAndRenderer("beautiful_garden", 1920, 1080, 0, &window, &renderer);
     TTF_Init();
 
     audioManager.init();
 
     menuFont = TTF_OpenFont("assets/Banty Bold.ttf", 72);
     dialogFont = TTF_OpenFont("assets/DejaVuSans.ttf", 48);
-    cutsceneFont = TTF_OpenFont("assets/DejaVuSans.ttf", 56); // для катсцен
 
     playerInventory.init(renderer, dialogFont, "assets/inventory/slot.png");
     pauseMenu.init(renderer, dialogFont);
@@ -281,11 +289,34 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     magicCrystalIcon = IMG_LoadTexture(renderer, "assets/items/magic_crystal.png");
     if (!magicCrystalIcon) magicCrystalIcon = createPlaceholderTexture({ 100, 150, 255, 255 });
 
+    // Загрузка текстур для выбора пола
+    malePlayerTexture = IMG_LoadTexture(renderer, "assets/player/male.png");
+    if (!malePlayerTexture) {
+        SDL_Surface* surf = SDL_CreateSurface(200, 200, SDL_PIXELFORMAT_ARGB8888);
+        SDL_FillSurfaceRect(surf, nullptr, SDL_MapSurfaceRGBA(surf, 100, 150, 255, 255));
+        malePlayerTexture = SDL_CreateTextureFromSurface(renderer, surf);
+        SDL_DestroySurface(surf);
+        SDL_Log("Created placeholder for male player texture");
+    }
+
+    femalePlayerTexture = IMG_LoadTexture(renderer, "assets/player/female.png");
+    if (!femalePlayerTexture) {
+        SDL_Surface* surf = SDL_CreateSurface(200, 200, SDL_PIXELFORMAT_ARGB8888);
+        SDL_FillSurfaceRect(surf, nullptr, SDL_MapSurfaceRGBA(surf, 255, 150, 200, 255));
+        femalePlayerTexture = SDL_CreateTextureFromSurface(renderer, surf);
+        SDL_DestroySurface(surf);
+        SDL_Log("Created placeholder for female player texture");
+    }
+
+    // Настройка колбэков для меню паузы
     pauseMenu.setVolumeCallback([&](float volume) { audioManager.setVolume(volume); });
     pauseMenu.setExitToMenuCallback([&]() {
         gameState = STATE_MENU;
+        waitingForCharacterSelect = false;
+        characterSelect.close();
         audioManager.stopMusic();
         audioManager.playMusic("assets/audio/Playboi-Carti-magnolia.wav", -1);
+        SDL_Log("Exit to menu");
         });
     pauseMenu.setExitToDesktopCallback([&]() {
         SDL_Event quitEvent;
@@ -293,6 +324,35 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
         SDL_PushEvent(&quitEvent);
         });
 
+    // Инициализация окна выбора персонажа
+    characterSelect.init(renderer, window, dialogFont, malePlayerTexture, femalePlayerTexture);
+    characterSelect.setOnConfirmCallback([&](CharacterGender gender) {
+        SDL_Log("=== CONFIRM CALLBACK TRIGGERED ===");
+        currentGender = gender;
+        waitingForCharacterSelect = false;
+        characterSelect.close();
+
+        if (gender == CharacterGender::MALE) {
+            player->setGenderTexture(malePlayerTexture);
+            SDL_Log("Selected: MALE");
+        }
+        else {
+            player->setGenderTexture(femalePlayerTexture);
+            SDL_Log("Selected: FEMALE");
+        }
+
+        gameState = STATE_GAME;
+
+        camera.zoom = 1.75f;
+        camera.update(player->worldX + 32.0f, player->worldY + 64.0f,
+            (float)(tileMap->mapWidth * tileMap->tileWidth),
+            (float)(tileMap->mapHeight * tileMap->tileHeight));
+
+        audioManager.setVolume(1.0f);
+        SDL_Log("Game started! State changed to GAME");
+        });
+
+    // Текстуры UI
     SDL_Color white = { 255, 255, 255, 255 };
     SDL_Surface* surf = TTF_RenderText_Blended(menuFont, "Press ENTER to start", 0, white);
     if (surf) {
@@ -316,7 +376,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     dialogueNPC->setRemoveItemCallback(removeItemFromInventory);
     dialogueNPC->setAddItemCallback(addItemToInventory);
 
-    player = new Player(renderer, "assets/player/1.png");
+    player = new Player(renderer, "assets/player/male.png");
     player->worldX = 500.0f;
     player->worldY = 400.0f;
 
@@ -325,11 +385,14 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
     tileMap->loadFromJSON("assets/map/1234.json");
     tileMap->loadTilesetTexture(renderer, "assets/Texture/TX Plant.png");
     player->setWorldBounds(
-        tileMap->mapWidth * tileMap->tileWidth,
-        tileMap->mapHeight * tileMap->tileHeight
+        (float)(tileMap->mapWidth * tileMap->tileWidth),
+        (float)(tileMap->mapHeight * tileMap->tileHeight)
     );
 
     initQuestItem();
+
+    gameState = STATE_MENU;
+    SDL_Log("Game initialized, state = MENU");
 
     return SDL_APP_CONTINUE;
 }
@@ -339,77 +402,46 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         return SDL_APP_SUCCESS;
 
     if (gameState == STATE_DISCLAIMER) {
-        if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_RETURN)
+        if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_RETURN) {
             gameState = STATE_EXTRA;
+            SDL_Log("Transition: DISCLAIMER -> EXTRA");
+        }
         return SDL_APP_CONTINUE;
     }
     else if (gameState == STATE_EXTRA) {
         if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_RETURN) {
             gameState = STATE_MENU;
             audioManager.playMusic("assets/audio/Playboi-Carti-magnolia.wav", -1);
+            SDL_Log("Transition: EXTRA -> MENU");
         }
         return SDL_APP_CONTINUE;
     }
     else if (gameState == STATE_MENU) {
-        if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_RETURN) {
-            // Вместо прямого запуска игры начинаем катсцену
-            startCutscene({
-                "ЧАСТЬ 1. ЭПОХА ДО БЕЗДНЫ",
-                "За тысячи лет до событий игры мир был другим.",
-                "Не существовало королевств, людей было мало.", "Большая часть земель принадлежала Первородным.",
-                "Они были бессмертны. Не старели. Не болели.",
-                "Люди просыли младшей расой и жили под их контролем.",
-                "Мир существовал в равновесии.Но это продолжалось недолго."
-                });
+        // Если ожидаем выбора персонажа - передаём события ему
+        if (waitingForCharacterSelect) {
+            characterSelect.handleEvent(*event);
+            return SDL_APP_CONTINUE;
         }
-        return SDL_APP_CONTINUE;
-    }
-    else if (gameState == STATE_CUTSCENE) {
-        if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_RETURN) {
-            // Если текст ещё печатается — сразу показать всю строку
-            if (!cutsceneLines.empty() && cutsceneLineIndex < cutsceneLines.size()) {
-                std::string& line = cutsceneLines[cutsceneLineIndex];
-                if (cutsceneVisibleChars < (int)line.length()) {
-                    cutsceneVisibleChars = (int)line.length();
-                    cutsceneCharTimer = (float)line.length() / CUTSCENE_CHAR_SPEED;
-                }
-                else {
-                    // Переход к следующей строке
-                    cutsceneLineIndex++;
-                    cutsceneVisibleChars = 0;
-                    cutsceneCharTimer = 0.0f;
-                    // Очищаем текстуру для следующей строки
-                    if (fullLineTexture) {
-                        SDL_DestroyTexture(fullLineTexture);
-                        fullLineTexture = nullptr;
-                    }
-                    lastLine.clear();
 
-                    // Если это была последняя строка — завершаем катсцену и запускаем игру
-                    if (cutsceneLineIndex >= cutsceneLines.size()) {
-                        gameState = STATE_GAME;
-                        audioManager.stopMusic();
-                        audioManager.playMusic("assets/audio/korolevskij_XVII_-_1_5__SkySound.cc__1.wav", -1);
-                        camera.zoom = 1.75f;
-                        camera.update(player->worldX + 32.0f, player->worldY + 64.0f,
-                            (float)(tileMap->mapWidth * tileMap->tileWidth),
-                            (float)(tileMap->mapHeight * tileMap->tileHeight));
-                        if (fullLineTexture) { SDL_DestroyTexture(fullLineTexture); fullLineTexture = nullptr; }
-                        lastLine.clear();
-                    }
-                }
-            }
+        if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_RETURN) {
+            SDL_Log("ENTER pressed in menu, opening character select");
+            waitingForCharacterSelect = true;
+            characterSelect.open();
+            audioManager.stopMusic();
+            audioManager.playMusic("assets/audio/korolevskij_XVII_-_1_5__SkySound.cc__1.wav", -1);
+            audioManager.setVolume(0.5f);
         }
         return SDL_APP_CONTINUE;
     }
     else if (gameState == STATE_GAME) {
-        // ESC для меню паузы
         if (event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_ESCAPE) {
             if (pauseMenu.isOpen()) {
                 pauseMenu.close();
+                SDL_Log("Pause menu closed");
             }
             else if (!dialogMgr.isActive()) {
                 pauseMenu.open();
+                SDL_Log("Pause menu opened");
             }
             return SDL_APP_CONTINUE;
         }
@@ -422,7 +454,6 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
         player->handleEvents();
 
         if (event->type == SDL_EVENT_KEY_DOWN) {
-            // Выбор в диалоге
             if (dialogMgr.isActive() && dialogMgr.isWaitingChoice()) {
                 if (event->key.key == SDLK_1) {
                     dialogMgr.handleChoice(1);
@@ -433,7 +464,6 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
                     audioManager.playMusic("assets/audio/korolevskij_XVII_-_1_5__SkySound.cc__1.wav", -1);
                 }
             }
-            // Диалог (E)
             else if (event->key.key == SDLK_E) {
                 if (!dialogMgr.isActive()) {
                     handleNPCDialogue();
@@ -445,25 +475,26 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
                     }
                 }
             }
-            // Инвентарь (1-8)
             else if (event->key.key >= SDLK_1 && event->key.key <= SDLK_8) {
                 int slot = event->key.key - SDLK_1;
                 playerInventory.setSelectedSlot(slot);
+                SDL_Log("Selected inventory slot: %d", slot);
             }
-            // Использование предмета (F)
             else if (event->key.key == SDLK_F) {
                 const InventorySlot* item = playerInventory.getSelectedItem();
                 if (item && !item->isEmpty()) {
+                    SDL_Log("=== Using item: %s (count: %d) ===", item->itemName.c_str(), item->count);
+
                     if (item->itemName == "Magic Crystal") {
-                        if (playerInventory.removeItem("Magic Crystal", 1)) {
-                            SDL_Log("SUCCESS: Magic Crystal used!");
-                        }
+                        SDL_Log("You used the magic crystal! It shines brightly!");
+                        playerInventory.removeItem("Magic Crystal", 1);
                     }
                     else if (item->itemName == "Golden Flower") {
-                        SDL_Log("Used the flower, but it stays.");
+                        SDL_Log("You used the Golden Flower! It scatters petals!");
+                        playerInventory.removeItem("Golden Flower", 1);
                     }
                     else if (item->itemName == "Magic Amulet") {
-                        SDL_Log("Amulet used, but remains.");
+                        SDL_Log("You used the amulet! You feel magical power!");
                     }
                 }
             }
@@ -478,24 +509,28 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    static Uint64 lastTicks = SDL_GetTicks();
-    Uint64 nowTicks = SDL_GetTicks();
-    float deltaTime = (nowTicks - lastTicks) / 1000.0f;
-    lastTicks = nowTicks;
-
     audioManager.update();
     pauseMenu.update(0.016f);
 
     if (gameState == STATE_MENU) {
-        if (menuBackground) {
-            SDL_FRect dest = { 0, 0, 1920, 1080 };
-            SDL_RenderTexture(renderer, menuBackground, NULL, &dest);
+        if (waitingForCharacterSelect) {
+            if (menuBackground) {
+                SDL_FRect dest = { 0, 0, 1920, 1080 };
+                SDL_RenderTexture(renderer, menuBackground, NULL, &dest);
+            }
+            characterSelect.draw();
         }
-        if (menuTextTexture) {
-            float texW, texH;
-            SDL_GetTextureSize(menuTextTexture, &texW, &texH);
-            SDL_FRect dest = { 1920 / 2.0f - texW / 2.0f, 1080 - 150.0f, texW, texH };
-            SDL_RenderTexture(renderer, menuTextTexture, NULL, &dest);
+        else {
+            if (menuBackground) {
+                SDL_FRect dest = { 0, 0, 1920, 1080 };
+                SDL_RenderTexture(renderer, menuBackground, NULL, &dest);
+            }
+            if (menuTextTexture) {
+                float texW, texH;
+                SDL_GetTextureSize(menuTextTexture, &texW, &texH);
+                SDL_FRect dest = { 1920 / 2.0f - texW / 2.0f, 1080 - 150.0f, texW, texH };
+                SDL_RenderTexture(renderer, menuTextTexture, NULL, &dest);
+            }
         }
     }
     else if (gameState == STATE_DISCLAIMER) {
@@ -522,58 +557,6 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
             SDL_RenderTexture(renderer, skipTextTexture, NULL, &dest);
         }
     }
-    else if (gameState == STATE_CUTSCENE) {
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-        SDL_RenderClear(renderer);
-
-        if (!cutsceneLines.empty() && cutsceneLineIndex < cutsceneLines.size()) {
-            std::string& line = cutsceneLines[cutsceneLineIndex];
-
-            // Плавное накопление времени
-            cutsceneCharTimer += deltaTime;
-            int targetChars = (int)(cutsceneCharTimer * CUTSCENE_CHAR_SPEED);
-            if (targetChars > (int)line.length()) targetChars = (int)line.length();
-            cutsceneVisibleChars = targetChars;
-
-            // Создаём полную текстуру строки, если она изменилась
-            if (line != lastLine || !fullLineTexture) {
-                if (fullLineTexture) SDL_DestroyTexture(fullLineTexture);
-                fullLineTexture = nullptr;
-
-                SDL_Color white = { 255, 255, 255, 255 };
-                SDL_Surface* surf = TTF_RenderText_Blended(cutsceneFont, line.c_str(), 0, white);
-                if (surf) {
-                    fullLineTexture = SDL_CreateTextureFromSurface(renderer, surf);
-                    SDL_DestroySurface(surf);
-                    lastLine = line;
-                }
-            }
-
-            if (fullLineTexture) {
-                // Получаем размер всей текстуры
-                float fullTexW, fullTexH;
-                SDL_GetTextureSize(fullLineTexture, &fullTexW, &fullTexH);
-
-                // Определяем ширину видимой части в зависимости от количества отображаемых символов
-                float visibleWidth = 0.0f;
-                if (cutsceneVisibleChars > 0) {
-                    visibleWidth = fullTexW * ((float)cutsceneVisibleChars / line.length());
-                }
-
-                if (visibleWidth > fullTexW) visibleWidth = fullTexW;
-
-                // Source rect - вырезаем левую часть текстуры от 0 до visibleWidth
-                SDL_FRect srcRect = { 0.0f, 0.0f, visibleWidth, fullTexH };
-
-                // Destination rect - позиция по центру экрана
-                float destX = 1920.0f / 2.0f - fullTexW / 2.0f;
-                float destY = 1080.0f / 2.0f - fullTexH / 2.0f;
-                SDL_FRect destRect = { destX, destY, visibleWidth, fullTexH };
-
-                SDL_RenderTexture(renderer, fullLineTexture, &srcRect, &destRect);
-            }
-        }
-    }
     else if (gameState == STATE_GAME) {
         camera.update(player->worldX + 32.0f, player->worldY + 64.0f,
             (float)(tileMap->mapWidth * tileMap->tileWidth),
@@ -592,10 +575,10 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
         player->draw(camera.x, camera.y, camera.zoom);
         dialogMgr.draw(renderer);
         pauseMenu.draw(1920.0f, 1080.0f);
-    }
 
-    if (gameState == STATE_GAME && !pauseMenu.isOpen()) {
-        playerInventory.draw(1920.0f, 1080.0f);
+        if (!pauseMenu.isOpen()) {
+            playerInventory.draw(1920.0f, 1080.0f);
+        }
     }
 
     SDL_RenderPresent(renderer);
@@ -604,6 +587,8 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 }
 
 void SDL_AppQuit(void* appstate, SDL_AppResult result) {
+    SDL_Log("Application quitting...");
+
     delete tileMap;
 
     if (menuBackground) SDL_DestroyTexture(menuBackground);
@@ -619,11 +604,11 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result) {
         SDL_DestroyTexture(goldenFlower.texture);
     }
 
-    if (fullLineTexture) SDL_DestroyTexture(fullLineTexture);
+    if (malePlayerTexture) SDL_DestroyTexture(malePlayerTexture);
+    if (femalePlayerTexture) SDL_DestroyTexture(femalePlayerTexture);
 
     if (menuFont) TTF_CloseFont(menuFont);
     if (dialogFont) TTF_CloseFont(dialogFont);
-    if (cutsceneFont) TTF_CloseFont(cutsceneFont);
 
     delete dialogueNPC;
     delete player;
@@ -632,8 +617,11 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result) {
     audioManager.cleanup();
     playerInventory.cleanup();
     pauseMenu.cleanup();
+    characterSelect.cleanup();
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
+
+    SDL_Log("Application quit successfully");
 }
